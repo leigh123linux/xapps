@@ -172,6 +172,9 @@ sn_item_dispose (GObject *object)
 
     g_clear_handle_id (&item->update_properties_timeout, g_source_remove);
 
+    if (item->cancellable != NULL)
+        g_cancellable_cancel (item->cancellable);
+
     g_clear_pointer (&item->sortable_name, g_free);
     g_clear_object (&item->status_icon);
     g_clear_object (&item->prop_proxy);
@@ -743,7 +746,8 @@ get_all_properties_callback (GObject      *source_object,
     if (error != NULL)
     {
         if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED) &&
-            !g_error_matches (error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_METHOD))
+            !g_error_matches (error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_METHOD) &&
+            item->sn_item_proxy != NULL)
         {
             g_critical ("Could not get properties for %s: %s\n",
                         g_dbus_proxy_get_name (item->sn_item_proxy),
@@ -756,6 +760,12 @@ get_all_properties_callback (GObject      *source_object,
 
     if (properties == NULL)
     {
+        return;
+    }
+
+    if (item->prop_proxy == NULL || item->sn_item_proxy == NULL)
+    {
+        g_clear_pointer (&properties, g_variant_unref);
         return;
     }
 
